@@ -53,12 +53,6 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun getDevices() = receiver.devices.collectAsState(initial = null).value
-
-    @Composable
-    private fun connectionState() = receiver.connectionState.collectAsState(initial = false).value
-
-    @Composable
     private fun setUIState() {
         if(!connectionState()){
             Log.v("setUIState", "if")
@@ -68,36 +62,6 @@ class MainActivity : ComponentActivity() {
             CreateConnectedUI()
         }
 
-    }
-
-    @Composable
-    private fun CreateConnectedUI() {
-        var text by remember { mutableStateOf(TextFieldValue("")) }
-        var message  by remember { mutableStateOf("non message received")}
-
-
-        Column {
-            TextField(
-                value = text,
-                onValueChange = { newText ->
-                    text = newText
-                }
-            )
-            Button(
-                modifier = Modifier.wrapContentSize(),
-                onClick = { receiver.sendMessage(text.text) }) {
-                Text(text = "send Message")
-            }
-            Button(modifier = Modifier.wrapContentSize(), onClick = {
-                message = receiver.readMessage()
-
-            }) {
-                Text(text = "get Message")
-            }
-            Text(text = message)
-
-
-        }
     }
 
     @Composable
@@ -120,6 +84,39 @@ class MainActivity : ComponentActivity() {
         }
 
     }
+
+    @Composable
+    private fun CreateConnectedUI() {
+        var messageToSend by remember { mutableStateOf(TextFieldValue("")) }
+        var receivedMessage  by remember { mutableStateOf("message not received")}
+
+        Column {
+            TextField(
+                value = messageToSend,
+                onValueChange = { newText ->
+                    messageToSend = newText
+                }
+            )
+            Button(
+                modifier = Modifier.wrapContentSize(),
+                onClick = { receiver.sendMessage(messageToSend.text) }) {
+                Text(text = "send Message")
+            }
+            Button(modifier = Modifier.wrapContentSize(), onClick = {
+                receivedMessage = receiver.readMessage()
+
+            }) {
+                Text(text = "get Message")
+            }
+            Text(text = receivedMessage)
+        }
+    }
+
+    @Composable
+    private fun getDevices() = receiver.devices.collectAsState(initial = null).value
+
+    @Composable
+    private fun connectionState() = receiver.connectionState.collectAsState(initial = false).value
 
     @Composable
     private fun GreetingView(name: String, onClick: (msg: String) -> Unit) {

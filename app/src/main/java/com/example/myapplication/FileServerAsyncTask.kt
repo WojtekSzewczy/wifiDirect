@@ -11,12 +11,14 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.net.ServerSocket
 import java.net.Socket
-class FileServerAsyncTask (private val context: Context){
-    val serverPort = 8888
-    lateinit var serverSocket : ServerSocket
-    lateinit var clientSocket : Socket
-    lateinit var inputStream : InputStream
-    lateinit var outputStream : OutputStream
+class FileServerAsyncTask (private val context: Context):wifiP2PMessages{
+    private val serverPort = 8888
+
+    private lateinit var serverSocket : ServerSocket
+    private lateinit var clientSocket : Socket
+    private lateinit var inputStream : InputStream
+    private lateinit var outputStream : OutputStream
+
     init{
         MainScope().launch(Dispatchers.IO) {
             serverSocket = ServerSocket(serverPort)
@@ -25,21 +27,10 @@ class FileServerAsyncTask (private val context: Context){
             outputStream = clientSocket.getOutputStream()
         }
     }
-    fun readMessage(): Deferred<String> {
-        return MainScope().async(Dispatchers.IO) {
-            val buffer = ByteArray(1024)
-            val bytesRead = inputStream.read(buffer)
-            if (bytesRead > 0) String(buffer, 0, bytesRead) else "empty message"
-        }
 
-    }
-    fun sendMessage(message : String){
-        MainScope().launch(Dispatchers.IO) {
-            outputStream.write(message.toByteArray())
-            outputStream.flush()
-        }
+    fun readMessage(): Deferred<String> = readMessage(inputStream)
 
-    }
+    fun sendMessage(message : String) = sendMessage(message ,outputStream)
 
 
     /* private val maninScope = MainScope()

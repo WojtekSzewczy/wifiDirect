@@ -15,7 +15,7 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 
-class Client(private val carContext: Context, hostAddress: InetAddress) {
+class Client(private val carContext: Context, hostAddress: InetAddress) : wifiP2PMessages{
     private val serverPort = 8888
     private val clientSocket = Socket()
     private lateinit var outputStream: OutputStream
@@ -31,22 +31,9 @@ class Client(private val carContext: Context, hostAddress: InetAddress) {
          }
     }
 
-    fun readMessage(): Deferred<String> {
-        return MainScope().async(Dispatchers.IO) {
-            val buffer = ByteArray(1024)
-            val bytesRead = inputStream.read(buffer)
+    fun readMessage(): Deferred<String> = readMessage(inputStream)
 
-             if (bytesRead > 0) String(buffer, 0, bytesRead) else "empty message"
-        }
-
-    }
-
-    fun sendMessage(message : String){
-        MainScope().launch(Dispatchers.IO) {
-            outputStream.write(message.toByteArray())
-            outputStream.flush()
-        }
-    }
+    fun sendMessage(message : String)= sendMessage(message, outputStream)
 
 
     /*private var len: Int = 1024

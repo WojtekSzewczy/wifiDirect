@@ -36,9 +36,9 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
         }
     }
     private val config = WifiP2pConfig()
-    lateinit var client :Client
-    lateinit var server :FileServerAsyncTask
-    private lateinit var deviceType :DeviceType
+    private lateinit var client :Client
+    private lateinit var server :FileServerAsyncTask
+    private lateinit var thisDeviceType :DeviceType
     private val mainScope = MainScope()
 
     private val _devices = MutableSharedFlow<WifiP2pDeviceList>()
@@ -76,7 +76,6 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
             }
         }
         manager.discoverPeers(channel, discoveryListener)
-
     }
 
     override fun onReceive(context: Context?, intent: Intent?) {
@@ -99,26 +98,11 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
 
             WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
                 Log.v(TAG,"WIFI_P2P_CONNECTION_CHANGED_ACTION")
-                                                    // to sie dzieje przy połączeniu
-                manager.requestConnectionInfo(channel // na obu urządzeniach z zaistalowana aplikacja jest to wołane
-                ) { wifiP2pInfo -> // wiec urządzenie wie czy jest hostem czy adminem w zależności czy spełnia te warunki
-                    MainScope().launch { _connectionState.emit(wifiP2pInfo?.groupFormed == true) }
 
-                    if (wifiP2pInfo?.groupFormed == true && wifiP2pInfo.isGroupOwner) {
-                        Toast.makeText(this.context, "I'm host", Toast.LENGTH_SHORT).show()
-                        Log.v(TAG, "i is host")
-                        server = FileServerAsyncTask(this.context)
-
-                        deviceType = DeviceType.SERVER
-                        //mainScope.launch{Log.v(DEFAULT_TAG,server.deferred.await())}
-
-                    } else if (wifiP2pInfo?.groupFormed == true) {
-                        Toast.makeText(this.context, "I'm client", Toast.LENGTH_SHORT).show()
-                        Log.v(TAG, "i is client")
-                        client= Client(this.context, wifiP2pInfo.groupOwnerAddress)
-
-                        deviceType = DeviceType.CLIENT
-                    }
+                manager.requestConnectionInfo(channel
+                ) { wifiP2pInfo ->
+                    MainScope().launch { _connectionState.emit(wifiP2pInfo.groupFormed) }
+                    setDeviceRole(wifiP2pInfo)
                 }
 
             }
@@ -129,8 +113,24 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
         }
     }
 
+    private fun setDeviceRole(wifiP2pInfo: WifiP2pInfo) {
+        if (wifiP2pInfo.groupFormed && wifiP2pInfo.isGroupOwner) {
+            Toast.makeText(this.context, "I'm host", Toast.LENGTH_SHORT).show()
+            server = FileServerAsyncTask(this.context)
+
+            thisDeviceType = DeviceType.SERVER
+
+        } else if (wifiP2pInfo.groupFormed) {
+            Toast.makeText(this.context, "I'm client", Toast.LENGTH_SHORT).show()
+            Log.v(TAG, "i is client")
+            client = Client(this.context, wifiP2pInfo.groupOwnerAddress)
+
+            thisDeviceType = DeviceType.CLIENT
+        }
+    }
+
     fun sendMessage(message : String){
-        when(deviceType){
+        when(thisDeviceType){
             DeviceType.SERVER -> {
                 server.sendMessage(message)
             }
@@ -140,7 +140,7 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
         }
     }
     fun readMessage():String{
-        return when(deviceType){
+        return when(thisDeviceType){
             DeviceType.SERVER -> {
                 runBlocking{server.readMessage().await()}
             }
