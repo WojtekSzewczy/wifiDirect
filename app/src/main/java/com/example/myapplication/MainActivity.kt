@@ -1,5 +1,7 @@
 package com.example.myapplication
 
+import android.app.Activity
+import android.content.Intent
 import android.net.wifi.p2p.WifiP2pDevice
 import android.os.Bundle
 import android.util.Log
@@ -34,8 +36,10 @@ import androidx.compose.ui.unit.dp
 import com.example.myapplication.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
-    private lateinit var receiver : WifiBroadcastReceiver
+    private lateinit var receiver: WifiBroadcastReceiver
     private val devices = mutableListOf<WifiP2pDevice>()
+    val PICK_PDF_FILE = 2
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         receiver = WifiBroadcastReceiver(this)
@@ -54,14 +58,47 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun setUIState() {
-        if(!connectionState()){
+
+        if (!connectionState()) {
             Log.v("setUIState", "if")
+
             CreateScanerUI()
-        }else{
+        } else {
             Log.v("setUIState", "else")
             CreateConnectedUI()
         }
 
+    }
+
+    private fun openFile() {
+
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            type = "*/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+        }
+        Log.v("MainActivity", "openFile")
+
+        startActivityForResult(intent, PICK_PDF_FILE)
+    }
+
+    override fun onActivityResult(
+
+        requestCode: Int, resultCode: Int, resultData: Intent?
+    ) {
+        super.onActivityResult(requestCode, resultCode, resultData)
+        Log.v("MainActivity", "onActivityResult")
+
+        if (requestCode == PICK_PDF_FILE
+            && resultCode == Activity.RESULT_OK
+        ) {
+            // The result data contains a URI for the document or directory that
+            // the user selected.
+            resultData?.data?.also { uri ->
+                Log.v("MainActivity", uri.path!!)
+
+                receiver.getUri(uri)
+            }
+        }
     }
 
     @Composable
@@ -70,17 +107,25 @@ class MainActivity : ComponentActivity() {
         val context = LocalContext.current
         val value = getDevices()
         Log.v("MainActivity", value.toString())
-        if(value!=null){
+        if (value != null) {
             val size = value.deviceList!!.toList().size
-            val list =  value.deviceList?.toList()
-            LazyColumn(modifier = Modifier.padding(vertical = 4.dp)) {
-                items(size) { number ->
-                    GreetingView(name = list?.get(number)?.deviceAddress+ list?.get(number)?.deviceName) {
-                        list?.get(number)?.let { receiver.connect(it) }
-                        Toast.makeText(context, list?.get(number)?.deviceAddress, Toast.LENGTH_LONG).show()
+            val list = value.deviceList?.toList()
+            Column {
+                Button(onClick = { openFile() }) {}
+                LazyColumn(modifier = Modifier.padding(vertical = 4.dp)) {
+                    items(size) { number ->
+                        GreetingView(name = list?.get(number)?.deviceAddress + list?.get(number)?.deviceName) {
+                            list?.get(number)?.let { receiver.connect(it) }
+                            Toast.makeText(
+                                context,
+                                list?.get(number)?.deviceAddress,
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     }
                 }
             }
+
         }
 
     }

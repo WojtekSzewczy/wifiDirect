@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pDeviceList
@@ -38,7 +39,8 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
     private val config = WifiP2pConfig()
     private lateinit var client :Client
     private lateinit var server :FileServerAsyncTask
-    private lateinit var thisDeviceType :DeviceType
+    private lateinit var thisDeviceType: DeviceType
+    private lateinit var uri: Uri
     private val mainScope = MainScope()
 
     private val _devices = MutableSharedFlow<WifiP2pDeviceList>()
@@ -86,54 +88,72 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
             }
 
             WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
-                Log.v(TAG,"WIFI_P2P_PEERS_CHANGED_ACTION")
-                manager.requestPeers(channel) { peers: WifiP2pDeviceList ->
-                    mainScope.launch {_devices.emit(peers)
-                        peers.deviceList.forEach {
-                            Log.v("P2P receiver", it.deviceName + " " + it.deviceAddress)
-                        }
-                    }
-                }
+                getPeers()
             }
 
             WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
-                Log.v(TAG,"WIFI_P2P_CONNECTION_CHANGED_ACTION")
-
-                manager.requestConnectionInfo(channel
-                ) { wifiP2pInfo ->
-                    MainScope().launch { _connectionState.emit(wifiP2pInfo.groupFormed) }
-                    setDeviceRole(wifiP2pInfo)
-                }
+                onConnected()
 
             }
 
             WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> {
-                Log.v(TAG,"WIFI_P2P_THIS_DEVICE_CHANGED_ACTION")
+                Log.v(TAG, "WIFI_P2P_THIS_DEVICE_CHANGED_ACTION")
+            }
+        }
+    }
+
+    private fun onConnected() {
+        Log.v(TAG, "WIFI_P2P_CONNECTION_CHANGED_ACTION")
+
+        manager.requestConnectionInfo(
+            channel
+        ) { wifiP2pInfo ->
+            MainScope().launch { _connectionState.emit(wifiP2pInfo.groupFormed) }
+            setDeviceRole(wifiP2pInfo)
+        }
+    }
+
+    private fun getPeers() {
+        Log.v(TAG, "WIFI_P2P_PEERS_CHANGED_ACTION")
+        manager.requestPeers(channel) { peers: WifiP2pDeviceList ->
+            mainScope.launch {
+                _devices.emit(peers)
+                peers.deviceList.forEach {
+                    Log.v("P2P receiver", it.deviceName + " " + it.deviceAddress)
+                }
             }
         }
     }
 
     private fun setDeviceRole(wifiP2pInfo: WifiP2pInfo) {
         if (wifiP2pInfo.groupFormed && wifiP2pInfo.isGroupOwner) {
-            Toast.makeText(this.context, "I'm host", Toast.LENGTH_SHORT).show()
-            server = FileServerAsyncTask(this.context)
-
-            thisDeviceType = DeviceType.SERVER
-
+            createServer()
         } else if (wifiP2pInfo.groupFormed) {
-            Toast.makeText(this.context, "I'm client", Toast.LENGTH_SHORT).show()
-            Log.v(TAG, "i is client")
-            client = Client(this.context, wifiP2pInfo.groupOwnerAddress)
-
-            thisDeviceType = DeviceType.CLIENT
+            createClient(wifiP2pInfo, uri)
         }
     }
 
-    fun sendMessage(message : String){
-        when(thisDeviceType){
+    private fun createServer() {
+        Toast.makeText(this.context, "I'm host", Toast.LENGTH_SHORT).show()
+        server = FileServerAsyncTask(this.context)
+
+        thisDeviceType = DeviceType.SERVER
+    }
+
+    private fun createClient(wifiP2pInfo: WifiP2pInfo, uri: Uri) {
+        Toast.makeText(this.context, "I'm client", Toast.LENGTH_SHORT).show()
+        Log.v(TAG, "i is client")
+        client = Client(this.context, wifiP2pInfo.groupOwnerAddress, uri)
+
+        thisDeviceType = DeviceType.CLIENT
+    }
+
+    fun sendMessage(message: String) {
+        when (thisDeviceType) {
             DeviceType.SERVER -> {
                 server.sendMessage(message)
             }
+
             DeviceType.CLIENT -> {
                 client.sendMessage(message)
             }
@@ -166,7 +186,13 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
             })
         }
     }
-    private enum class DeviceType{
+
+    fun getUri(receivedUri: Uri) {
+        Log.v(TAG, receivedUri.path!!)
+        uri = receivedUri
+    }
+
+    private enum class DeviceType {
         CLIENT, SERVER
     }
 }

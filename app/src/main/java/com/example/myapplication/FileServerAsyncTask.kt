@@ -1,16 +1,20 @@
 package com.example.myapplication
 
 import android.content.Context
-import androidx.core.app.NotificationCompat.MessagingStyle.Message
+import android.os.Environment
+import android.util.Log
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.ServerSocket
 import java.net.Socket
+
 class FileServerAsyncTask (private val context: Context):wifiP2PMessages{
     private val serverPort = 8888
 
@@ -23,14 +27,62 @@ class FileServerAsyncTask (private val context: Context):wifiP2PMessages{
         MainScope().launch(Dispatchers.IO) {
             serverSocket = ServerSocket(serverPort)
             clientSocket = serverSocket.accept()
-            inputStream = clientSocket.getInputStream()
             outputStream = clientSocket.getOutputStream()
+            val f = File(
+                Environment.getExternalStorageDirectory().absolutePath +
+                        "/${context.packageName}/wifip2pshared-${System.currentTimeMillis()}.jpg"
+            )
+            val dirs = File(f.parent)
+
+            dirs.takeIf { it.doesNotExist() }?.apply {
+                mkdirs()
+            }
+            Log.v("Server ", "chuj dupa kurwa")
+            f.createNewFile()
+            val inputStream = clientSocket.getInputStream()
+            copyFile(inputStream, FileOutputStream(f))
+            serverSocket.close()
+            f.absolutePath
         }
     }
 
+    private fun File.doesNotExist(): Boolean = !exists()
+
+    private fun copyFile(inputStream: InputStream, outputStream: OutputStream): Long {
+        try {
+            val buffer = ByteArray(1024000)
+            var bytesRead: Int
+            var totalBytesCopied: Long = 0
+
+            while (inputStream.read(buffer).also {
+                    bytesRead = it
+                } != -1) {
+                Log.v("Server ", "kopiuje")
+
+                outputStream.write(buffer, 0, bytesRead)
+                totalBytesCopied += bytesRead
+            }
+
+            outputStream.flush()
+            return totalBytesCopied
+        } catch (e: IOException) {
+            // Obsługa błędu odczytu lub zapisu pliku
+            e.printStackTrace()
+            return -1 // Zwraca -1, aby wskazać, że wystąpił błąd
+        } finally {
+            try {
+                inputStream.close()
+                outputStream.close()
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+
     fun readMessage(): Deferred<String> = readMessage(inputStream)
 
-    fun sendMessage(message : String) = sendMessage(message ,outputStream)
+    fun sendMessage(message: String) = sendMessage(message, outputStream)
 
 
     /* private val maninScope = MainScope()
