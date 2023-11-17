@@ -2,7 +2,6 @@ package com.example.myapplication
 
 import android.app.Activity
 import android.content.Intent
-import android.net.wifi.p2p.WifiP2pDevice
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -37,8 +36,7 @@ import com.example.myapplication.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var receiver: WifiBroadcastReceiver
-    private val devices = mutableListOf<WifiP2pDevice>()
-    val PICK_PDF_FILE = 2
+    private val INTENT_IDENTIFIER = 2
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,47 +57,22 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun setUIState() {
 
-        if (!connectionState()) {
-            Log.v("setUIState", "if")
-
-            CreateScanerUI()
-        } else {
-            Log.v("setUIState", "else")
+        if (connectionState()) { // sprawdza czy jesteśmy połączeni z innym urządzeniem
             CreateConnectedUI()
+        } else {
+            CreateScanerUI()
         }
-
     }
 
     private fun openFile() {
-
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             type = "*/*"
             addCategory(Intent.CATEGORY_OPENABLE)
         }
         Log.v("MainActivity", "openFile")
-
-        startActivityForResult(intent, PICK_PDF_FILE)
+        startActivityForResult(intent, INTENT_IDENTIFIER)
     }
 
-    override fun onActivityResult(
-
-        requestCode: Int, resultCode: Int, resultData: Intent?
-    ) {
-        super.onActivityResult(requestCode, resultCode, resultData)
-        Log.v("MainActivity", "onActivityResult")
-
-        if (requestCode == PICK_PDF_FILE
-            && resultCode == Activity.RESULT_OK
-        ) {
-            // The result data contains a URI for the document or directory that
-            // the user selected.
-            resultData?.data?.also { uri ->
-                Log.v("MainActivity", uri.path!!)
-
-                receiver.getUri(uri)
-            }
-        }
-    }
 
     @Composable
     private fun CreateScanerUI() {
@@ -144,6 +117,13 @@ class MainActivity : ComponentActivity() {
             )
             Button(
                 modifier = Modifier.wrapContentSize(),
+                onClick = {
+
+                    openFile()
+                })
+            { Text(text = "send File") }
+            /*Button(
+                modifier = Modifier.wrapContentSize(),
                 onClick = { receiver.sendMessage(messageToSend.text) }) {
                 Text(text = "send Message")
             }
@@ -154,6 +134,7 @@ class MainActivity : ComponentActivity() {
                 Text(text = "get Message")
             }
             Text(text = receivedMessage)
+  */
         }
     }
 
@@ -182,6 +163,26 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onActivityResult(
+
+        requestCode: Int, resultCode: Int, resultData: Intent?
+    ) {
+        super.onActivityResult(requestCode, resultCode, resultData)
+        Log.v("MainActivity", "onActivityResult")
+
+        if (requestCode == INTENT_IDENTIFIER
+            && resultCode == Activity.RESULT_OK
+        ) {
+            // The result data contains a URI for the document or directory that
+            // the user selected.
+            resultData?.data?.also { uri ->
+                Log.v("MainActivity", uri.path!!)
+                receiver.getUri(uri)
+            }
+        }
+    }
+
 
     @Preview(showBackground = true)
     @Composable

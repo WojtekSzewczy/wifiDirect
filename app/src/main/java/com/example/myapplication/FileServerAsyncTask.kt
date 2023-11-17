@@ -15,35 +15,41 @@ import java.io.OutputStream
 import java.net.ServerSocket
 import java.net.Socket
 
-class FileServerAsyncTask (private val context: Context):wifiP2PMessages{
+class FileServerAsyncTask(private val context: Context) : wifiP2PMessages {
     private val serverPort = 8888
 
-    private lateinit var serverSocket : ServerSocket
-    private lateinit var clientSocket : Socket
-    private lateinit var inputStream : InputStream
-    private lateinit var outputStream : OutputStream
+    private lateinit var serverSocket: ServerSocket
+    private lateinit var clientSocket: Socket
+    private lateinit var inputStream: InputStream
+    private lateinit var outputStream: OutputStream
 
-    init{
+    init {
         MainScope().launch(Dispatchers.IO) {
             serverSocket = ServerSocket(serverPort)
             clientSocket = serverSocket.accept()
             outputStream = clientSocket.getOutputStream()
-            val f = File(
-                Environment.getExternalStorageDirectory().absolutePath +
-                        "/${context.packageName}/wifip2pshared-${System.currentTimeMillis()}.jpg"
-            )
-            val dirs = File(f.parent)
-
-            dirs.takeIf { it.doesNotExist() }?.apply {
-                mkdirs()
-            }
-            Log.v("Server ", "chuj dupa kurwa")
-            f.createNewFile()
-            val inputStream = clientSocket.getInputStream()
-            copyFile(inputStream, FileOutputStream(f))
-            serverSocket.close()
-            f.absolutePath
+            inputStream = clientSocket.getInputStream()
         }
+    }
+
+    private fun receiveFile() {
+        val file = createNewFile()
+        copyFile(inputStream, FileOutputStream(file))
+        serverSocket.close()
+        file.absolutePath
+    }
+
+    private fun createNewFile(): File {
+        val file = File(
+            Environment.getExternalStorageDirectory().absolutePath + "/${context.packageName}/wifip2pshared-${System.currentTimeMillis()}.jpg"
+        )
+        val dirs = File(file.parent)
+
+        dirs.takeIf { it.doesNotExist() }?.apply {
+            mkdirs()
+        }
+        file.createNewFile()
+        return file
     }
 
     private fun File.doesNotExist(): Boolean = !exists()

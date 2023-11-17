@@ -23,6 +23,7 @@ import kotlinx.coroutines.runBlocking
 @SuppressLint("MissingPermission")
 class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() {
 
+
     private val manager: WifiP2pManager by lazy(LazyThreadSafetyMode.NONE) {
         context.applicationContext.getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
     }
@@ -36,18 +37,13 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
         override fun onFailure(error: Int) {
         }
     }
-    private val config = WifiP2pConfig()
-    private lateinit var client :Client
-    private lateinit var server :FileServerAsyncTask
-    private lateinit var thisDeviceType: DeviceType
-    private lateinit var uri: Uri
     private val mainScope = MainScope()
-
+    private val config = WifiP2pConfig()
     private val _devices = MutableSharedFlow<WifiP2pDeviceList>()
     private val _connectionState = MutableSharedFlow<Boolean>()
     val devices: Flow<WifiP2pDeviceList>
         get() = _devices
-    val connectionState : Flow<Boolean>
+    val connectionState: Flow<Boolean>
         get() = _connectionState
 
     private val intentFilter = IntentFilter().apply {
@@ -59,11 +55,17 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
 
     private val TAG = WifiBroadcastReceiver::class.simpleName
 
+    private lateinit var messagingMenager: MessagingMenager
+    private lateinit var thisDeviceType: DeviceType
+    private lateinit var uri: Uri
+    private lateinit var wifiP2Pinfo: WifiP2pInfo
+
+
     init {
-        Log.v(TAG , "init")
+        Log.v(TAG, "init")
         context.applicationContext.registerReceiver(this, intentFilter)
-        manager.requestConnectionInfo(channel){
-            if(it.groupFormed){
+        manager.requestConnectionInfo(channel) {
+            if (it.groupFormed) {
                 manager.removeGroup(channel,object : WifiP2pManager.ActionListener{
                     override fun onSuccess() {
                         Log.v(TAG, "Succesfully removed group")
@@ -103,13 +105,16 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
     }
 
     private fun onConnected() {
-        Log.v(TAG, "WIFI_P2P_CONNECTION_CHANGED_ACTION")
+        Log.v(
+            TAG,
+            "WIFI_P2P_CONNECTION_CHANGED_ACTION"
+        ) // tworzymy klienta od razu po połączeniu a chcemy później
 
-        manager.requestConnectionInfo(
-            channel
-        ) { wifiP2pInfo ->
-            MainScope().launch { _connectionState.emit(wifiP2pInfo.groupFormed) }
-            setDeviceRole(wifiP2pInfo)
+        manager.requestConnectionInfo(channel) { obtainedWifiP2pInfo ->
+            MainScope().launch { _connectionState.emit(obtainedWifiP2pInfo.groupFormed) } // została stworzona grupa - czy nawiązano połączenie
+            wifiP2Pinfo = obtainedWifiP2pInfo
+            //to można przenieść gdzieś dalej -  to ma się wykonać po wybraniu pliku w zasadzie
+            //setDeviceRole(wifiP2pInfo) // w zależności od tego czy urzadzenie jest hostem czy klientem tworzy dopowiednia klase
         }
     }
 
@@ -125,26 +130,25 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
         }
     }
 
-    private fun setDeviceRole(wifiP2pInfo: WifiP2pInfo) {
-        if (wifiP2pInfo.groupFormed && wifiP2pInfo.isGroupOwner) {
+    private fun setDeviceRole() {
+
+        if (wifiP2Pinfo.groupFormed && wifiP2Pinfo.isGroupOwner) {
             createServer()
-        } else if (wifiP2pInfo.groupFormed) {
-            createClient(wifiP2pInfo, uri)
+        } else if (wifiP2Pinfo.groupFormed) {
+            createClient(wifiP2Pinfo, uri)
         }
     }
 
     private fun createServer() {
         Toast.makeText(this.context, "I'm host", Toast.LENGTH_SHORT).show()
-        server = FileServerAsyncTask(this.context)
-
+        messagingMenager = MessagingMenager(FileServerAsyncTask(this.context))
         thisDeviceType = DeviceType.SERVER
     }
 
     private fun createClient(wifiP2pInfo: WifiP2pInfo, uri: Uri) {
         Toast.makeText(this.context, "I'm client", Toast.LENGTH_SHORT).show()
-        Log.v(TAG, "i is client")
-        client = Client(this.context, wifiP2pInfo.groupOwnerAddress, uri)
-
+        messagingMenager =
+            MessagingMenager(Client(this.context, wifiP2pInfo.groupOwnerAddress, uri))
         thisDeviceType = DeviceType.CLIENT
     }
 
@@ -159,6 +163,7 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
             }
         }
     }
+
     fun readMessage():String{
         return when(thisDeviceType){
             DeviceType.SERVER -> {
@@ -190,6 +195,7 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
     fun getUri(receivedUri: Uri) {
         Log.v(TAG, receivedUri.path!!)
         uri = receivedUri
+        setDeviceRole()
     }
 
     private enum class DeviceType {
