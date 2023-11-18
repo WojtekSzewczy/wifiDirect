@@ -1,10 +1,20 @@
 package com.example.myapplication
 
+import android.net.Uri
+
 class MessagingMenager(
-    private var messagingEntity: wifiP2PMessages? = null,
+    private var messagingEntity: MessagingInterface
 ) {
-    fun doSomething() {
-        messagingEntity.
+    fun sendFile(uri: Uri) {
+        messagingEntity.sendFile(uri)
+    }
+
+    fun receiveFile() {
+        messagingEntity.receiveFile()
+    }
+
+    fun sendMessage(message: String) {
+        messagingEntity.sendMessage(message)
     }
 
 }

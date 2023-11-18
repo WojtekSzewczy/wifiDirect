@@ -15,8 +15,8 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 
-interface wifiP2PMessages {
-    fun sendMessage(message : String, outputStream: OutputStream){
+open class Connectable {
+    fun sendMessage(message: String, outputStream: OutputStream) {
         MainScope().launch(Dispatchers.IO) {
             outputStream.write(message.toByteArray())
             outputStream.flush()
@@ -31,7 +31,7 @@ interface wifiP2PMessages {
         }
     }
 
-    private fun sendFile(uri: Uri, outputStream: OutputStream, context: Context) {
+    fun sendFile(uri: Uri, outputStream: OutputStream, context: Context) {
         val buf = ByteArray(1024000)
         var len: Int? = null
 
@@ -44,7 +44,7 @@ interface wifiP2PMessages {
         inputStream?.close()
     }
 
-    private fun receiveFile(inputStream: InputStream, context: Context) {
+    fun receiveFile(inputStream: InputStream, context: Context) {
         val file = createNewFile(context)
         copyFile(inputStream, FileOutputStream(file))
     }

@@ -84,7 +84,7 @@ class MainActivity : ComponentActivity() {
             val size = value.deviceList!!.toList().size
             val list = value.deviceList?.toList()
             Column {
-                Button(onClick = { openFile() }) {}
+                Button(onClick = { }) {} //TODO start scan po bożemu
                 LazyColumn(modifier = Modifier.padding(vertical = 4.dp)) {
                     items(size) { number ->
                         GreetingView(name = list?.get(number)?.deviceAddress + list?.get(number)?.deviceName) {
@@ -106,7 +106,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun CreateConnectedUI() {
         var messageToSend by remember { mutableStateOf(TextFieldValue("")) }
-        var receivedMessage  by remember { mutableStateOf("message not received")}
+        var receivedMessage by remember { mutableStateOf("message not received") }
 
         Column {
             TextField(
@@ -115,27 +115,29 @@ class MainActivity : ComponentActivity() {
                     messageToSend = newText
                 }
             )
+            setButton()
+        }
+    }
+
+    @Composable
+    private fun setButton() {
+        if (!isUploadStarted()) {
             Button(
                 modifier = Modifier.wrapContentSize(),
                 onClick = {
-
                     openFile()
+                    receiver.sendMessage("DUBZGO")
                 })
             { Text(text = "send File") }
-            /*Button(
+        } else {
+            Button(
                 modifier = Modifier.wrapContentSize(),
-                onClick = { receiver.sendMessage(messageToSend.text) }) {
-                Text(text = "send Message")
-            }
-            Button(modifier = Modifier.wrapContentSize(), onClick = {
-                receivedMessage = receiver.readMessage()
-
-            }) {
-                Text(text = "get Message")
-            }
-            Text(text = receivedMessage)
-  */
+                onClick = {
+                    receiver.receiveFile()
+                })
+            { Text(text = "Receive File") }
         }
+
     }
 
     @Composable
@@ -143,6 +145,9 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun connectionState() = receiver.connectionState.collectAsState(initial = false).value
+
+    @Composable
+    private fun isUploadStarted() = receiver.uploadStart.collectAsState(initial = false).value
 
     @Composable
     private fun GreetingView(name: String, onClick: (msg: String) -> Unit) {
@@ -174,11 +179,9 @@ class MainActivity : ComponentActivity() {
         if (requestCode == INTENT_IDENTIFIER
             && resultCode == Activity.RESULT_OK
         ) {
-            // The result data contains a URI for the document or directory that
-            // the user selected.
             resultData?.data?.also { uri ->
                 Log.v("MainActivity", uri.path!!)
-                receiver.getUri(uri)
+                receiver.sendFile(uri)
             }
         }
     }
