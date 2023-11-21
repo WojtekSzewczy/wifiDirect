@@ -30,25 +30,6 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
     private val channel: WifiP2pManager.Channel =
         manager.initialize(context, Looper.getMainLooper(), null)
 
-    private val discoveryListener = object : WifiP2pManager.ActionListener {
-        override fun onSuccess() {
-        }
-
-        override fun onFailure(error: Int) {
-        }
-    }
-    private val mainScope = MainScope()
-    private val config = WifiP2pConfig()
-    private val _devices = MutableSharedFlow<WifiP2pDeviceList>()
-    private val _connectionState = MutableSharedFlow<Boolean>()
-    private val _uploadStart = MutableSharedFlow<Boolean>()
-    val devices: Flow<WifiP2pDeviceList>
-        get() = _devices
-    val connectionState: Flow<Boolean>
-        get() = _connectionState
-    val uploadStart: Flow<Boolean>
-        get() = _uploadStart
-
     private val intentFilter = IntentFilter().apply {
         addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
         addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
@@ -105,7 +86,7 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
         Log.v(TAG, "WIFI_P2P_PEERS_CHANGED_ACTION")
         manager.requestPeers(channel) { peers: WifiP2pDeviceList ->
             mainScope.launch {
-                _devices.emit(peers)
+                Emiters.emitDevices(peers)
                 peers.deviceList.forEach {
                     Log.v("P2P receiver", it.deviceName + " " + it.deviceAddress)
                 }
@@ -130,16 +111,9 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
     }
 
     private fun onConnected() {
-        Log.v(
-            TAG,
-            "WIFI_P2P_CONNECTION_CHANGED_ACTION"
-        )
-
-        manager.requestConnectionInfo(channel) { obtainedWifiP2pInfo ->
-            MainScope().launch { _connectionState.emit(obtainedWifiP2pInfo.groupFormed) } // została stworzona grupa - czy nawiązano połączenie
-            device = Device(obtainedWifiP2pInfo)
-
-            setDeviceRole() // w zależności od tego czy urzadzenie jest hostem czy klientem tworzy dopowiednia klase
+        manager.requestConnectionInfo(channel) { wifiP2pInfo ->
+            MainScope().launch { Emiters.emitConnectionState(wifiP2pInfo.groupFormed) } // została stworzona grupa - czy nawiązano połączenie
+            device = Device(wifiP2pInfo, context)
         }
     }
 
