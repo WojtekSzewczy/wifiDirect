@@ -1,7 +1,9 @@
-package com.example.myapplication
+package com.example.myapplication.messaging.client_server
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
+import com.example.myapplication.messaging.MessagingInterface
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
@@ -20,11 +22,14 @@ class Server(private val context: Context) : Connectable(), MessagingInterface {
     private lateinit var outputStream: OutputStream
 
     init {
+        Log.v("Server", "Server")
         MainScope().launch(Dispatchers.IO) {
             serverSocket = ServerSocket(serverPort)
             clientSocket = serverSocket.accept()
             outputStream = clientSocket.getOutputStream()
             inputStream = clientSocket.getInputStream()
+            Log.v("Server", "finished initialization")
+
         }
     }
 

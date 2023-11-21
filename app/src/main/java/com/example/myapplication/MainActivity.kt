@@ -36,7 +36,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.example.myapplication.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
-    private lateinit var receiver: WifiBroadcastReceiver
+    private val TAG = MainActivity::class.simpleName
     private val INTENT_IDENTIFIER = 2
     private lateinit var viewModel: MainActivityViewModel
 
@@ -46,7 +46,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MyApplicationTheme {
-                // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
@@ -55,6 +54,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     }
 
     @Composable
@@ -64,6 +64,8 @@ class MainActivity : ComponentActivity() {
             Log.v(TAG, "connected")
             CreateConnectedUI()
         } else {
+            Log.v(TAG, "scanner")
+
             CreateScanerUI()
         }
     }
@@ -106,7 +108,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        }
 
     }
 
@@ -133,7 +134,6 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.wrapContentSize(),
                 onClick = {
                     openFile()
-                    receiver.sendMessage("DUBZGO")
                 })
             { Text(text = "send File") }
         } else {
@@ -195,4 +195,14 @@ class MainActivity : ComponentActivity() {
             // Greeting("Android")
         }
     }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        Log.v(TAG, "DUPA")
+    }
+
 }

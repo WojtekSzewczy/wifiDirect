@@ -1,7 +1,8 @@
-package com.example.myapplication
+package com.example.myapplication.messaging.client_server
 
 import android.content.Context
 import android.net.Uri
+import com.example.myapplication.messaging.MessagingInterface
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope

@@ -1,28 +1,22 @@
-package com.example.myapplication
+package com.example.myapplication.connection
 
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.net.Uri
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pDeviceList
-import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Looper
 import android.util.Log
-import android.widget.Toast
-import kotlinx.coroutines.Dispatchers
+import com.example.myapplication.Emiters
 import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 
 @SuppressLint("MissingPermission")
 class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() {
-
 
     private val manager: WifiP2pManager by lazy(LazyThreadSafetyMode.NONE) {
         context.applicationContext.getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
@@ -40,41 +34,45 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
     private val TAG = WifiBroadcastReceiver::class.simpleName
     private val mainScope = MainScope()
     private lateinit var device: Device
+    var flag = false
 
 
     init {
         context.applicationContext.registerReceiver(this, intentFilter)
         manager.requestConnectionInfo(channel) {
-            if (it.groupFormed) {
-                manager.removeGroup(channel, object : WifiP2pManager.ActionListener {
-                    override fun onSuccess() {
-                        Log.v(TAG, "Succesfully removed group")
-                    }
 
-                    override fun onFailure(p0: Int) {
-                        Log.v(TAG, "failed to remove group removed")
+            manager.removeGroup(channel, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
 
-                    }
+                }
 
-                })
-            }
+                override fun onFailure(p0: Int) {
+                }
+            })
+
         }
-        manager.discoverPeers(channel, discoveryListener)
+
     }
 
     override fun onReceive(context: Context?, intent: Intent?) {
         when (intent?.action) {
             WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> {
-                Log.v(TAG,"WIFI_P2P_STATE_CHANGED_ACTION")
-                // Check to see if Wi-Fi is enabled and notify appropriate activity
+                Log.v(TAG, "WIFI_P2P_STATE_CHANGED_ACTION")
             }
 
             WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
+                Log.v(TAG, "WIFI_P2P_PEERS_CHANGED_ACTION")
+
                 getPeers()
             }
 
             WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
-                onConnected()
+                Log.v(TAG, "WIFI_P2P_CONNECTION_CHANGED_ACTION")
+                manager.requestConnectionInfo(channel) {
+                    if (it.groupFormed) {
+                        onConnected()
+                    }
+                }
             }
 
             WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> {
@@ -82,6 +80,17 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
             }
         }
     }
+
+    fun startScan() {
+        manager.discoverPeers(channel, object : WifiP2pManager.ActionListener {
+            override fun onSuccess() {
+            }
+
+            override fun onFailure(error: Int) {
+            }
+        })
+    }
+
     private fun getPeers() {
         Log.v(TAG, "WIFI_P2P_PEERS_CHANGED_ACTION")
         manager.requestPeers(channel) { peers: WifiP2pDeviceList ->
@@ -95,7 +104,7 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
     }
 
     fun connect(wifiP2pDevice: WifiP2pDevice) {
-        config.deviceAddress = wifiP2pDevice.deviceAddress
+        val config = WifiP2pConfig().apply { deviceAddress = wifiP2pDevice.deviceAddress }
         channel.also { channel ->
             manager.connect(channel, config, object : WifiP2pManager.ActionListener {
                 override fun onSuccess() {

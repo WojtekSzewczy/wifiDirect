@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.example.myapplication.messaging
 
 import android.net.Uri
 import kotlinx.coroutines.Deferred

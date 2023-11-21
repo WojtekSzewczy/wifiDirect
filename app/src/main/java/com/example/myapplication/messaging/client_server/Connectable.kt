@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.example.myapplication.messaging.client_server
 
 import android.content.Context
 import android.net.Uri
@@ -32,21 +32,28 @@ open class Connectable {
     }
 
     fun sendFile(uri: Uri, outputStream: OutputStream, context: Context) {
-        val buf = ByteArray(1024000)
-        var len: Int? = null
+        MainScope().launch(Dispatchers.IO) {
+            val buf = ByteArray(1024000)
+            var len: Int? = null
 
-        val cr = context.contentResolver
-        val inputStream: InputStream? = cr.openInputStream(uri)
-        while (inputStream?.read(buf).also { len = it } != -1) {
-            outputStream.write(buf, 0, len!!)
+            val cr = context.contentResolver
+            val inputStream: InputStream? = cr.openInputStream(uri)
+            while (inputStream?.read(buf).also { len = it } != -1) {
+                outputStream.write(buf, 0, len!!)
+            }
+            outputStream.flush()
+            // outputStream.close()
+            //inputStream?.close()
         }
-        outputStream.close()
-        inputStream?.close()
+
     }
 
     fun receiveFile(inputStream: InputStream, context: Context) {
-        val file = createNewFile(context)
-        copyFile(inputStream, FileOutputStream(file))
+        MainScope().launch(Dispatchers.IO) {
+            val file = createNewFile(context)
+            copyFile(inputStream, FileOutputStream(file))
+        }
+
     }
 
     private fun createNewFile(context: Context): File {
@@ -73,11 +80,12 @@ open class Connectable {
             while (inputStream.read(buffer).also {
                     bytesRead = it
                 } != -1) {
-                Log.v("Server ", "kopiuje")
+                Log.v("Connectable ", "kopiuje")
 
                 outputStream.write(buffer, 0, bytesRead)
                 totalBytesCopied += bytesRead
             }
+            Log.v("Connectable", "copying finished")
 
             outputStream.flush()
             return totalBytesCopied
@@ -87,8 +95,8 @@ open class Connectable {
             return -1 // Zwraca -1, aby wskazać, że wystąpił błąd
         } finally {
             try {
-                inputStream.close()
-                outputStream.close()
+                //inputStream.close()
+                //outputStream.close()
             } catch (e: IOException) {
                 e.printStackTrace()
             }
