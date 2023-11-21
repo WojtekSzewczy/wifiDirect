@@ -7,6 +7,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,7 +23,6 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,15 +32,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
 import com.example.myapplication.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var receiver: WifiBroadcastReceiver
     private val INTENT_IDENTIFIER = 2
+    private lateinit var viewModel: MainActivityViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        receiver = WifiBroadcastReceiver(this)
+        viewModel = ViewModelProvider(this).get(MainActivityViewModel::class.java)
+
         setContent {
             MyApplicationTheme {
                 // A surface container using the 'background' color from the theme
@@ -57,7 +60,8 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun setUIState() {
 
-        if (connectionState()) { // sprawdza czy jesteśmy połączeni z innym urządzeniem
+        if (viewModel.connectionState()) { // sprawdza czy jesteśmy połączeni z innym urządzeniem
+            Log.v(TAG, "connected")
             CreateConnectedUI()
         } else {
             CreateScanerUI()
@@ -78,26 +82,29 @@ class MainActivity : ComponentActivity() {
     private fun CreateScanerUI() {
 
         val context = LocalContext.current
-        val value = getDevices()
-        Log.v("MainActivity", value.toString())
-        if (value != null) {
-            val size = value.deviceList!!.toList().size
-            val list = value.deviceList?.toList()
-            Column {
-                Button(onClick = { }) {} //TODO start scan po bożemu
-                LazyColumn(modifier = Modifier.padding(vertical = 4.dp)) {
-                    items(size) { number ->
-                        GreetingView(name = list?.get(number)?.deviceAddress + list?.get(number)?.deviceName) {
-                            list?.get(number)?.let { receiver.connect(it) }
-                            Toast.makeText(
-                                context,
-                                list?.get(number)?.deviceAddress,
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
+        val value = viewModel.getDevices()
+        Log.v(TAG, value.toString())
+
+        val size = if (value != null) value.deviceList!!.toList().size else 0
+        val list = if (value != null) value.deviceList?.toList() else emptyList()
+        Column {
+            Button(onClick = {
+                viewModel.startScan()
+                Log.v(TAG, "DUPA")
+            }) { Text(text = "start scan") } //TODO start scan po bożemu
+            LazyColumn(modifier = Modifier.padding(vertical = 4.dp)) {
+                items(size) { number ->
+                    GreetingView(name = list?.get(number)?.deviceAddress + list?.get(number)?.deviceName) {
+                        list?.get(number)?.let { viewModel.connect(it) }
+                        Toast.makeText(
+                            context,
+                            list?.get(number)?.deviceAddress,
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             }
+        }
 
         }
 
@@ -121,7 +128,7 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun setButton() {
-        if (!isUploadStarted()) {
+        if (!viewModel.isUploadStarted()) {
             Button(
                 modifier = Modifier.wrapContentSize(),
                 onClick = {
@@ -133,21 +140,13 @@ class MainActivity : ComponentActivity() {
             Button(
                 modifier = Modifier.wrapContentSize(),
                 onClick = {
-                    receiver.receiveFile()
+                    viewModel.receiveFile()
                 })
             { Text(text = "Receive File") }
         }
 
     }
 
-    @Composable
-    private fun getDevices() = receiver.devices.collectAsState(initial = null).value
-
-    @Composable
-    private fun connectionState() = receiver.connectionState.collectAsState(initial = false).value
-
-    @Composable
-    private fun isUploadStarted() = receiver.uploadStart.collectAsState(initial = false).value
 
     @Composable
     private fun GreetingView(name: String, onClick: (msg: String) -> Unit) {
@@ -180,8 +179,10 @@ class MainActivity : ComponentActivity() {
             && resultCode == Activity.RESULT_OK
         ) {
             resultData?.data?.also { uri ->
+                viewModel.sendMessage("DUBZGO")
+
                 Log.v("MainActivity", uri.path!!)
-                receiver.sendFile(uri)
+                viewModel.sendFile(uri)
             }
         }
     }
