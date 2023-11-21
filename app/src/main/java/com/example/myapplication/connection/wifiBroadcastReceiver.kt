@@ -57,11 +57,7 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
     }
 
     private val TAG = WifiBroadcastReceiver::class.simpleName
-
-    private lateinit var messagingMenager: MessagingMenager
-    private lateinit var uri: Uri
-    private lateinit var wifiP2Pinfo: WifiP2pInfo
-    private lateinit var uploadListener: UploadListener
+    private val mainScope = MainScope()
     private lateinit var device: Device
 
 
@@ -147,42 +143,6 @@ class WifiBroadcastReceiver(private val context: Context) : BroadcastReceiver() 
         }
     }
 
-    private fun setDeviceRole() = if (wifiP2Pinfo.isGroupOwner) createServer() else createClient()
-
-    private fun createServer() {
-        Toast.makeText(this.context, "I'm host", Toast.LENGTH_SHORT).show()
-        val server = Server(this.context)
-        enableComunication(server)
-    }
-
-    private fun createClient() {
-        Toast.makeText(this.context, "I'm client", Toast.LENGTH_SHORT).show()
-        val client = Client(this.context, wifiP2Pinfo.groupOwnerAddress)
-        enableComunication(client)
-    }
-
-    private fun enableComunication(connectable: MessagingInterface) {
-        messagingMenager = MessagingMenager(connectable)
-        uploadListener = UploadListener(connectable)
-        mainScope.launch(Dispatchers.IO) { _uploadStart.emit(uploadListener.listenForUpload()) }
-    }
-
-    fun sendMessage(message: String) {
-        messagingMenager.sendMessage(message)
-    }
-
-    fun sendFile(uri: Uri) {
-        messagingMenager.sendFile(uri)
-    }
-
-    fun receiveFile() {
-        messagingMenager.receiveFile()
-    }
-
-
-    fun getUri(receivedUri: Uri) {
-        Log.v(TAG, receivedUri.path!!)
-        uri = receivedUri
-    }
+    fun getDevice() = device
 
 }
