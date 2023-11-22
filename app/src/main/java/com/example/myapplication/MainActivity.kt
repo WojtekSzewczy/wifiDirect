@@ -2,13 +2,16 @@ package com.example.myapplication
 
 import android.app.Activity
 import android.content.Intent
+import android.net.wifi.p2p.WifiP2pDevice
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,22 +19,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.Button
 import androidx.compose.material.Card
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
-import androidx.compose.material.TextField
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
 import com.example.myapplication.ui.theme.MyApplicationTheme
 
@@ -43,12 +46,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewModel = ViewModelProvider(this).get(MainActivityViewModel::class.java)
+        PermissionRequester(this).requestPermissions()
 
         setContent {
             MyApplicationTheme {
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colors.background
+                    modifier = Modifier.fillMaxSize(), color = MaterialTheme.colors.background
                 ) {
                     setUIState()
                 }
@@ -59,13 +62,11 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun setUIState() {
-
         if (viewModel.connectionState()) { // sprawdza czy jesteśmy połączeni z innym urządzeniem
             Log.v(TAG, "connected")
             CreateConnectedUI()
         } else {
             Log.v(TAG, "scanner")
-
             CreateScanerUI()
         }
     }
@@ -83,87 +84,193 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun CreateScanerUI() {
 
-        val context = LocalContext.current
         val value = viewModel.getDevices()
+
         Log.v(TAG, value.toString())
 
         val size = if (value != null) value.deviceList!!.toList().size else 0
         val list = if (value != null) value.deviceList?.toList() else emptyList()
+        if (viewModel.getDevices() != null) {
+            CreateDiscoveredDevicesUI(size, list)
+        } else {
+            CreateStartScanUI()
+
+        }
+    }
+
+    @Composable
+    private fun CreateStartScanUI() {
+        val interactionSource = remember { MutableInteractionSource() }
+        Column(
+            Modifier
+                .padding(20.dp)
+                .wrapContentSize()
+                .clickable(
+                    indication = null, interactionSource = interactionSource
+                ) { viewModel.startScan() })
+        {
+            Box(
+                modifier = Modifier
+                    .wrapContentSize()
+                    .align(Alignment.CenterHorizontally)
+
+            ) {
+                Image(
+                    painter = painterResource(id = R.mipmap.magnyfying_foreground),
+                    contentDescription = null,
+                    modifier = Modifier.wrapContentSize(),
+                    colorFilter = ColorFilter.tint(Color(120, 120, 150))
+                )
+
+            }
+            Box(
+                modifier = Modifier
+                    .padding(10.dp)
+                    .wrapContentSize()
+                    .align(Alignment.CenterHorizontally)
+            ) {
+                Text(
+                    text = "Tap to start scan",
+                    fontSize = 20.sp,
+                    color = Color(100, 100, 120)
+                )
+
+            }
+        }
+    }
+
+    @Composable
+    private fun CreateDiscoveredDevicesUI(
+        size: Int,
+        list: List<WifiP2pDevice>?
+    ) {
         Column {
-            Button(onClick = {
-                viewModel.startScan()
-                Log.v(TAG, "DUPA")
-            }) { Text(text = "start scan") } //TODO start scan po bożemu
-            LazyColumn(modifier = Modifier.padding(vertical = 4.dp)) {
+            Text(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(vertical = 10.dp),
+                fontSize = 20.sp,
+                textAlign = TextAlign.End,
+                text = "Select device to connect",
+                color = Color(100, 100, 120)
+
+            )
+
+            LazyColumn(modifier = Modifier.padding(vertical = 10.dp, horizontal = 10.dp)) {
                 items(size) { number ->
-                    GreetingView(name = list?.get(number)?.deviceAddress + list?.get(number)?.deviceName) {
+                    addItems(list?.get(number)?.deviceName) {
                         list?.get(number)?.let { viewModel.connect(it) }
-                        Toast.makeText(
-                            context,
-                            list?.get(number)?.deviceAddress,
-                            Toast.LENGTH_LONG
-                        ).show()
                     }
                 }
             }
         }
-
-
     }
 
     @Composable
     private fun CreateConnectedUI() {
-        var messageToSend by remember { mutableStateOf(TextFieldValue("")) }
-        var receivedMessage by remember { mutableStateOf("message not received") }
-
-        Column {
-            TextField(
-                value = messageToSend,
-                onValueChange = { newText ->
-                    messageToSend = newText
-                }
-            )
-            setButton()
-        }
-    }
-
-    @Composable
-    private fun setButton() {
+        val interactionSource = remember { MutableInteractionSource() }
         if (!viewModel.isUploadStarted()) {
-            Button(
-                modifier = Modifier.wrapContentSize(),
-                onClick = {
-                    openFile()
-                })
-            { Text(text = "send File") }
+            SendingFileUI(interactionSource)
         } else {
-            Button(
-                modifier = Modifier.wrapContentSize(),
-                onClick = {
-                    viewModel.receiveFile()
-                })
-            { Text(text = "Receive File") }
+            ReceivingFileUI(interactionSource)
         }
+    }
 
+    @Composable
+    private fun ReceivingFileUI(interactionSource: MutableInteractionSource) {
+        Column(modifier = Modifier.run {
+            wrapContentSize()
+                .clickable(
+                    indication = null, interactionSource = interactionSource
+                ) { viewModel.receiveFile() }
+                .padding(8.dp)
+        }) {
+            Box(
+                modifier = Modifier
+                    .wrapContentSize()
+                    .align(Alignment.CenterHorizontally)
+            ) {
+                addArrowImage(false)
+            }
+            Box(
+                modifier = Modifier
+                    .wrapContentSize()
+                    .align(Alignment.CenterHorizontally)
+                    .padding(20.dp)
+            ) {
+                Text(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    textAlign = TextAlign.Center,
+                    text = "Click to receive file",
+                    fontSize = 20.sp,
+                    color = Color(100, 100, 120)
+                )
+
+            }
+        }
+    }
+
+    @Composable
+    private fun SendingFileUI(interactionSource: MutableInteractionSource) {
+        Column(modifier = Modifier.run {
+            wrapContentSize()
+                .clickable(
+                    indication = null, interactionSource = interactionSource
+                ) { openFile() }
+                .padding(8.dp)
+        }) {
+            Box(
+                modifier = Modifier
+                    .wrapContentSize()
+                    .align(alignment = Alignment.CenterHorizontally)
+            ) {
+                addArrowImage(true)
+
+            }
+            Box(
+                modifier = Modifier
+                    .wrapContentSize()
+                    .align(Alignment.CenterHorizontally)
+                    .padding(20.dp)
+            ) {
+                Text(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    textAlign = TextAlign.Center,
+                    text = "Click to send file",
+                    fontSize = 20.sp,
+                    color = Color(100, 100, 120)
+                )
+            }
+        }
     }
 
 
     @Composable
-    private fun GreetingView(name: String, onClick: (msg: String) -> Unit) {
-        val msg = "Hello, $name"
+    private fun addArrowImage(upsideDown: Boolean) {
+        Image(
+            painter = painterResource(id = R.mipmap.szczalki_foregroud),
+            contentDescription = null,
+            modifier = Modifier
+                .wrapContentSize()
+                .rotate(if (upsideDown) 270F else 90F),
+            colorFilter = ColorFilter.tint(Color(120, 120, 150))
+        )
+    }
+
+    @Composable
+    private fun addItems(name: String?, onClick: () -> Unit) {
 
         Card(
-            backgroundColor = MaterialTheme.colors.primary,
+            backgroundColor = Color(120, 120, 150),
             modifier = Modifier
                 .padding(vertical = 4.dp, horizontal = 8.dp)
-                .clickable { onClick(msg) }
-        ) {
+                .clickable { onClick() }) {
             Row(
                 modifier = Modifier
                     .padding(12.dp)
                     .fillMaxWidth()
             ) {
-                Text(text = msg)
+                Text(text = if (!name.isNullOrEmpty()) name else "")
             }
         }
     }
@@ -175,9 +282,7 @@ class MainActivity : ComponentActivity() {
         super.onActivityResult(requestCode, resultCode, resultData)
         Log.v("MainActivity", "onActivityResult")
 
-        if (requestCode == INTENT_IDENTIFIER
-            && resultCode == Activity.RESULT_OK
-        ) {
+        if (requestCode == INTENT_IDENTIFIER && resultCode == Activity.RESULT_OK) {
             resultData?.data?.also { uri ->
                 viewModel.sendMessage("DUBZGO")
 
@@ -187,22 +292,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
-    @Preview(showBackground = true)
-    @Composable
-    fun DefaultPreview() {
-        MyApplicationTheme {
-            // Greeting("Android")
-        }
-    }
-
     override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        Log.v(TAG, "DUPA")
     }
+
+    @Preview
+    @Composable
+    fun CreateScanerUIPrv() {
+        CreateScanerUI()
+    }
+
+    @Preview
+    @Composable
+    fun CreateConnectedUIPrv() {
+        CreateConnectedUI()
+    }
+
 
 }
